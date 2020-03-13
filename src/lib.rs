@@ -7,6 +7,7 @@
 // except according to those terms.
 #![no_std]
 extern crate alloc;
+#[macro_use] extern crate log;
 
 use core::cmp::Ord;
 use core::fmt::{self, Debug};
@@ -57,6 +58,8 @@ where
 struct NodePtr<K: Ord, V>(*mut RBTreeNode<K, V>);
 
 unsafe impl<K: Ord + Send, V: Send> Send for NodePtr<K,V> {}
+// We don't implement the Sync trait for NodePtr since pointers in Rust are generally not marked as Send or Sync. 
+// Send is implemented so that we can wrap an RBTree within a Mutex as a static item.
 
 impl<K: Ord, V> Clone for NodePtr<K, V> {
     fn clone(&self) -> NodePtr<K, V> {
@@ -380,19 +383,19 @@ impl<K: Ord + Debug, V: Debug> RBTree<K, V> {
             return;
         }
         if direction == 0 {
-            // unsafe {
-                // println!("'{:?}' is root node", (*node.0));
-            // }
+            unsafe {
+                debug!("'{:?}' is root node", (*node.0));
+            }
         } else {
-            let _direct = if direction == -1 { "left" } else { "right" };
-            // unsafe {
-                // println!(
-                //     "{:?} is {:?}'s {:?} child ",
-                //     (*node.0),
-                //     *node.parent().0,
-                //     direct
-                // );
-            // }
+            let direct = if direction == -1 { "left" } else { "right" };
+            unsafe {
+                debug!(
+                    "{:?} is {:?}'s {:?} child ",
+                    (*node.0),
+                    *node.parent().0,
+                    direct
+                );
+            }
         }
         self.tree_print(node.left(), -1);
         self.tree_print(node.right(), 1);
@@ -400,12 +403,12 @@ impl<K: Ord + Debug, V: Debug> RBTree<K, V> {
 
     pub fn print_tree(&self) {
         if self.root.is_null() {
-            // println!("This is a empty tree");
+            debug!("This is a empty tree");
             return;
         }
-        // println!("This tree size = {:?}, begin:-------------", self.len());
+        debug!("This tree size = {:?}, begin:-------------", self.len());
         self.tree_print(self.root, 0);
-        // println!("end--------------------------");
+        debug!("end--------------------------");
     }
 }
 
