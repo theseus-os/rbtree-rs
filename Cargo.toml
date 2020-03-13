@@ -10,3 +10,7 @@ readme = "README.md"
 keywords = ["HashMap", "RBTree", "rbtree"]
 
 [dev-dependencies]
+
+[dependencies.log]
+default-features = false
+version = "0.3.7"

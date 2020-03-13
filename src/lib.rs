@@ -5,15 +5,20 @@
 // <LICENSE-MIT or http://opensource.org/licenses/MIT>, at your
 // option. This file may not be copied, modified, or distributed
 // except according to those terms.
+#![no_std]
+extern crate alloc;
+#[macro_use] extern crate log;
 
-use std::cmp::Ord;
-use std::fmt::{self, Debug};
-use std::cmp::Ordering;
-use std::ptr;
-use std::iter::{IntoIterator, FromIterator};
-use std::marker;
-use std::mem;
-use std::ops::Index;
+use core::cmp::Ord;
+use core::fmt::{self, Debug};
+use core::cmp::Ordering;
+use core::ptr;
+use core::iter::{IntoIterator, FromIterator};
+use core::marker;
+use core::mem;
+use core::ops::Index;
+use alloc::boxed::Box;
+use core::marker::Send;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum Color {
@@ -51,6 +56,10 @@ where
 /*****************NodePtr***************************/
 #[derive(Debug)]
 struct NodePtr<K: Ord, V>(*mut RBTreeNode<K, V>);
+
+unsafe impl<K: Ord + Send, V: Send> Send for NodePtr<K,V> {}
+// We don't implement the Sync trait for NodePtr since pointers in Rust are generally not marked as Send or Sync. 
+// Send is implemented so that we can wrap an RBTree within a Mutex as a static item.
 
 impl<K: Ord, V> Clone for NodePtr<K, V> {
     fn clone(&self) -> NodePtr<K, V> {
@@ -330,6 +339,8 @@ impl<K: Ord + Clone, V: Clone> NodePtr<K, V> {
 ///   .iter().cloned().collect();
 ///  // use the values stored in rbtree
 ///  ```
+/// 
+
 pub struct RBTree<K: Ord, V> {
     root: NodePtr<K, V>,
     len: usize,
@@ -373,12 +384,12 @@ impl<K: Ord + Debug, V: Debug> RBTree<K, V> {
         }
         if direction == 0 {
             unsafe {
-                println!("'{:?}' is root node", (*node.0));
+                debug!("'{:?}' is root node", (*node.0));
             }
         } else {
             let direct = if direction == -1 { "left" } else { "right" };
             unsafe {
-                println!(
+                debug!(
                     "{:?} is {:?}'s {:?} child ",
                     (*node.0),
                     *node.parent().0,
@@ -392,12 +403,12 @@ impl<K: Ord + Debug, V: Debug> RBTree<K, V> {
 
     pub fn print_tree(&self) {
         if self.root.is_null() {
-            println!("This is a empty tree");
+            debug!("This is a empty tree");
             return;
         }
-        println!("This tree size = {:?}, begin:-------------", self.len());
+        debug!("This tree size = {:?}, begin:-------------", self.len());
         self.tree_print(self.root, 0);
-        println!("end--------------------------");
+        debug!("end--------------------------");
     }
 }
 
@@ -1062,6 +1073,55 @@ impl<K: Ord, V> RBTree<K, V> {
             }
         }
         NodePtr::null()
+    }
+
+    #[inline]
+    /// Returns the node for which the given key value is greater than or equal to,
+    /// but less than the key value of the right child.
+    pub fn find_node_between(&self, k: &K) -> Option<&mut V> {
+        if self.root.is_null() {
+            return None;
+        }
+        let mut temp = &self.root;
+        let mut ordering;
+        unsafe {
+            loop {
+                let next = match k.cmp(&(*temp.0).key) {
+                    Ordering::Less => {
+                        ordering = Ordering::Less;
+                        &mut (*temp.0).left
+                    },
+                    Ordering::Greater => {
+                        ordering = Ordering::Greater;
+                        &mut (*temp.0).right
+                    },
+                    Ordering::Equal => return Some(&mut (*temp.0).value),
+                };
+                if next.is_null() {
+                    break;
+                }
+                temp = next;
+            }
+        }
+
+        // if the ordering is greater, then we already have the node we need.
+        // if the ordering is lesser, then we have to iterate up the parent nodes until we find the node that the given key is greater than.
+        if ordering == Ordering::Less {
+            while temp != &self.root {
+                unsafe {
+                    let parent_key = &(*(*temp.0).parent.0).key;
+                    if k.cmp(parent_key) == Ordering::Greater {
+                        temp = &mut (*temp.0).parent;
+                        break;
+                    }
+                    else {
+                        temp = &mut (*temp.0).parent;
+                    }
+                }
+            }
+        }
+
+        unsafe { Some(&mut (*temp.0).value) }
     }
 
     #[inline]
