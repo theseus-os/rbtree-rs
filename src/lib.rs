@@ -17,7 +17,7 @@ use core::marker;
 use core::mem;
 use core::ops::Index;
 use alloc::boxed::Box;
-use core::marker::{Send, Sync};
+use core::marker::Send;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 enum Color {
@@ -34,9 +34,6 @@ struct RBTreeNode<K: Ord, V> {
     key: K,
     value: V,
 }
-
-unsafe impl<K: Send + Ord, V: Send> Send for RBTreeNode<K,V> {}
-unsafe impl<K: Sync + Ord, V: Sync> Sync for RBTreeNode<K,V> {}
 
 impl<K: Ord, V> RBTreeNode<K, V> {
     #[inline]
@@ -59,8 +56,7 @@ where
 #[derive(Debug)]
 struct NodePtr<K: Ord, V>(*mut RBTreeNode<K, V>);
 
-unsafe impl<K: Send + Ord, V: Send> Send for NodePtr<K,V> {}
-unsafe impl<K: Sync + Ord, V: Sync> Sync for NodePtr<K,V> {}
+unsafe impl<K: Ord + Send, V: Send> Send for NodePtr<K,V> {}
 
 impl<K: Ord, V> Clone for NodePtr<K, V> {
     fn clone(&self) -> NodePtr<K, V> {
@@ -384,19 +380,19 @@ impl<K: Ord + Debug, V: Debug> RBTree<K, V> {
             return;
         }
         if direction == 0 {
-            unsafe {
+            // unsafe {
                 // println!("'{:?}' is root node", (*node.0));
-            }
+            // }
         } else {
-            let direct = if direction == -1 { "left" } else { "right" };
-            unsafe {
+            let _direct = if direction == -1 { "left" } else { "right" };
+            // unsafe {
                 // println!(
                 //     "{:?} is {:?}'s {:?} child ",
                 //     (*node.0),
                 //     *node.parent().0,
                 //     direct
                 // );
-            }
+            // }
         }
         self.tree_print(node.left(), -1);
         self.tree_print(node.right(), 1);
