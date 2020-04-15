@@ -13,4 +13,4 @@ keywords = ["HashMap", "RBTree", "rbtree"]
 
 [dependencies.log]
 default-features = false
-version = "0.3.7"
+version = "0.4.8"
